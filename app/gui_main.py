@@ -47,22 +47,66 @@ def show_ocr_result(data):
         ]
     elif doc_type == "passport":
         formatted_lines += [
-            f"{'Name'.ljust(18)}: {data.get('Name', '')}",
-            f"{'DOB'.ljust(18)}: {data.get('DOB', '')}",
-            f"{'Passport Number'.ljust(18)}: {data.get('Passport Number', '')}"
-        ]
+        f"{'Surname'.ljust(18)}: {data.get('Surname', '')}",
+        f"{'Given Name'.ljust(18)}: {data.get('Given Name', '')}",
+        f"{'DOB'.ljust(18)}: {data.get('DOB', '')}",
+        f"{'Gender'.ljust(18)}: {data.get('Gender', '')}",
+        f"{'Passport Number'.ljust(18)}: {data.get('Passport Number', '')}",
+        f"{'Nationality'.ljust(18)}: {data.get('Nationality', '')}",
+        f"{'Place of Birth'.ljust(18)}: {data.get('Place of Birth', '')}",
+        f"{'Place of Issue'.ljust(18)}: {data.get('Place of Issue', '')}",
+        f"{'Date of Issue'.ljust(18)}: {data.get('Date of Issue', '')}",
+        f"{'Date of Expiry'.ljust(18)}: {data.get('Date of Expiry', '')}"
+    ]
+    fallback = {"Unknown Name", "Unknown", "",
+                "01/01/1990",          # dummy DOB
+                "A0000000"}            # dummy passport #
+    suspicious = any(val in fallback
+                     for key, val in data.items()
+                     if key in {"Surname", "Given Name", "DOB",
+                                "Gender", "Passport Number",
+                                "Nationality", "Place of Birth",
+                                "Place of Issue", "Date of Issue",
+                                "Date of Expiry"})
+
+    
 
     # Simple suspicious flag logic (if required field is missing)
-    suspicious = False
+    # ---------------- Suspicious flag logic ---------------- #
+    def bad(val: str, bad_list: list[str]):
+        """Return True if empty or in a list of fallback tokens."""
+        return (not val) or (val.strip() in bad_list)
+
+    suspicious = False               # default
+
     if doc_type == "aadhaar":
-        if not data.get("Name") or not data.get("DOB") or not data.get("Gender") or not data.get("Aadhaar Number"):
-            suspicious = True
+        suspicious = any([
+            bad(data.get("Name"),           ["Unknown Name"]),
+            bad(data.get("DOB"),            ["01/01/1990"]),
+            bad(data.get("Gender"),         ["Unknown"]),
+            bad(data.get("Aadhaar Number"), ["000000000000"]),
+        ])
+
     elif doc_type == "pan":
-        if not data.get("Name") or not data.get("DOB") or not data.get("Father Name") or not data.get("PAN Number"):
-            suspicious = True
+        suspicious = any([
+            bad(data.get("Name"),        ["Unknown Name"]),
+            bad(data.get("Father Name"), ["Unknown Father"]),
+            bad(data.get("DOB"),         ["01/01/1990"]),
+            bad(data.get("PAN Number"),  ["AAAAA0000A"]),
+        ])
 
+    elif doc_type == "passport":
+        suspicious = any([
+            bad(data.get("Surname"),          ["Unknown Name"]),
+            bad(data.get("Given Name"),       ["Unknown Name"]),
+            bad(data.get("DOB"),              ["01/01/1990"]),
+            bad(data.get("Passport Number"),  ["A0000000"]),
+        ])
+    # ------------------------------------------------------- #
+
+    # rebuild the formatted text, now including Status line
     formatted_lines.append(f"{'Status'.ljust(18)}: {'Suspicious' if suspicious else 'Clear'}")
-
+    
     formatted = "\n".join(formatted_lines)
     text_box.insert("1.0", formatted)
     text_box.config(state="disabled")
@@ -155,7 +199,7 @@ class EKYCApp:
     def ocr(self):
         file_path = filedialog.askopenfilename(title="Select Document Image", filetypes=[("Image Files", "*.png *.jpg *.jpeg")])
         if file_path:
-            selected_type = self.doc_type_var.get()
+            selected_type = self.doc_type_var.get()  # FIXED LINE HERE
             try:
                 data = extract_document_data(file_path, selected_type)
                 insert_data(data)

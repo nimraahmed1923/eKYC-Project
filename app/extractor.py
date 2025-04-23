@@ -8,7 +8,7 @@ def extract_document_data(image_path, selected_doc_type):
         results = reader.readtext(image_path)
         doc_type = selected_doc_type
         aadhaar_number = pan_number = passport_number = name = father_name = address = dob = gender = ""
-
+        surname = given_name = place_of_birth = place_of_issue = date_of_issue = date_of_expiry = nationality = ""
         # Get y-position and text sorted top-down
         boxes = [(min([pt[1] for pt in box]), text.strip()) for box, text, _ in results]
         boxes.sort()
@@ -93,18 +93,54 @@ def extract_document_data(image_path, selected_doc_type):
 
         # === Passport Logic (Untouched) ===
         elif doc_type == "Passport":
-            for _, text in boxes:
+            passport_number_pattern = r"\b[A-Z][0-9]{7}\b"
+            dob_pattern = r"\d{2}[-/]\d{2}[-/]\d{4}"
+
+            for i, (_, line) in enumerate(boxes):
+                # Passport Number
                 if not passport_number:
-                    match = re.search(r"[A-Z][0-9]{7}", text)
+                    match = re.search(passport_number_pattern, line)
                     if match:
                         passport_number = match.group()
+
+                # Nationality and Gender
+                if "INDIAN" in line.upper():
+                    nationality = "INDIAN"
+                if re.search(r"\b[M|F]\b", line):
+                    gender = re.search(r"\b[M|F]\b", line).group()
+
+                # Date of Birth
                 if not dob:
-                    dob_match = re.search(r"\d{2}[-./]\d{2}[-./]\d{4}", text)
+                    dob_match = re.search(dob_pattern, line)
                     if dob_match:
                         dob = dob_match.group()
-            name_candidates = [b[1] for b in boxes if len(b[1].split()) >= 2 and not re.search(r"\d", b[1])]
-            if name_candidates:
-                name = name_candidates[0]
+
+                # Place of Birth (comma separated all caps line)
+                if ',' in line and line.upper() == line and not re.search(r'\d', line):
+                    place_of_birth = line.strip()
+
+                # Place of Issue (usually same format, below Place of Birth)
+                if not place_of_issue and place_of_birth and i > 0:
+                    next_line = boxes[i + 1][1] if i + 1 < len(boxes) else ''
+                    if next_line.upper() == next_line and not re.search(r'\d', next_line):
+                        place_of_issue = next_line.strip()
+
+                # Date of Issue & Expiry
+                date_matches = re.findall(dob_pattern, line)
+                if len(date_matches) == 2:
+                    date_of_issue, date_of_expiry = date_matches
+
+            # Given Name & Surname Logic
+            for i, (_, line) in enumerate(boxes):
+                if "surname" in line.lower():
+                    if i + 1 < len(boxes):
+                        surname = boxes[i + 1][1].strip()
+                if "given" in line.lower():
+                    if i + 1 < len(boxes):
+                        given_name = boxes[i + 1][1].strip()
+
+            # Assign name as "GIVEN SURNAME"
+            name = f"{given_name} {surname}".strip()
 
         # === Fallbacks ===
         if not aadhaar_number: aadhaar_number = '000000000000'
