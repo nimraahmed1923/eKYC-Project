@@ -1,0 +1,16 @@
+# Ignore Python virtual environments
+ekyc_env/
+venv/
+.venv/
+
+# Byte-compiled / cache files
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Ignore VSCode settings
+.vscode/
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
