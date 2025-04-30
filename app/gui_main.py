@@ -53,9 +53,7 @@ def show_ocr_result(data):
         f"{'Gender'.ljust(18)}: {data.get('Gender', '')}",
         f"{'Passport Number'.ljust(18)}: {data.get('Passport Number', '')}",
         f"{'Nationality'.ljust(18)}: {data.get('Nationality', '')}",
-        f"{'Place of Birth'.ljust(18)}: {data.get('Place of Birth', '')}",
-        f"{'Place of Issue'.ljust(18)}: {data.get('Place of Issue', '')}",
-        f"{'Date of Issue'.ljust(18)}: {data.get('Date of Issue', '')}",
+        
         f"{'Date of Expiry'.ljust(18)}: {data.get('Date of Expiry', '')}"
     ]
     fallback = {"Unknown Name", "Unknown", "",
@@ -65,8 +63,7 @@ def show_ocr_result(data):
                      for key, val in data.items()
                      if key in {"Surname", "Given Name", "DOB",
                                 "Gender", "Passport Number",
-                                "Nationality", "Place of Birth",
-                                "Place of Issue", "Date of Issue",
+                                "Nationality", 
                                 "Date of Expiry"})
 
     
@@ -269,6 +266,7 @@ class EKYCApp:
                 messagebox.showerror("Export Error", str(e))
         else:
             messagebox.showwarning("Cancelled", "Export cancelled.")
+        
 
 
 if __name__ == "__main__":

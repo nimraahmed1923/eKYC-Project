@@ -1,54 +1,59 @@
 import easyocr
 import re
+from PIL import Image
 
 reader = easyocr.Reader(['en'], gpu=False)
+
+def format_mrz_date(date_str):
+    try:
+        year = int(date_str[:2])
+        full_year = "19" + date_str[:2] if year > 30 else "20" + date_str[:2]
+        return f"{date_str[4:6]}/{date_str[2:4]}/{full_year}"
+    except:
+        return ""
 
 def extract_document_data(image_path, selected_doc_type):
     try:
         results = reader.readtext(image_path)
         doc_type = selected_doc_type
+
+        # Initial values
         aadhaar_number = pan_number = passport_number = name = father_name = address = dob = gender = ""
         surname = given_name = place_of_birth = place_of_issue = date_of_issue = date_of_expiry = nationality = ""
-        # Get y-position and text sorted top-down
+
+        # Combine lines and sort by vertical position
         boxes = [(min([pt[1] for pt in box]), text.strip()) for box, text, _ in results]
         boxes.sort()
-        text_full = ' '.join([b[1] for b in boxes])
+        text_lines = [b[1] for b in boxes]
+        text_full = ' '.join(text_lines).upper()
 
-# === Aadhaar Logic (Final Clean Name Extraction) ===
+        # === Aadhaar Logic ===
         if doc_type == "Aadhaar":
             aadhaar_match = re.search(r"\b\d{4}[\s-]?\d{4}[\s-]?\d{4}\b", text_full)
             if aadhaar_match:
                 aadhaar_number = aadhaar_match.group().replace(" ", "").replace("-", "")
 
+            # Extract name
             gov_found = False
-            for _, line in boxes:
+            for line in text_lines:
                 clean = line.strip()
-
-                # Skip Hindi/garbage/symbols
-                if any(char in clean for char in "!@#$%^&*()[]{}:;<>/\\|1234567890"):
-                    continue
-                if clean.upper() == clean:  # Skip all-caps (like GOVERNMENT)
+                if any(char.isdigit() for char in clean) or clean.isupper():
                     continue
                 if "government of india" in clean.lower():
                     gov_found = True
                     continue
-
-                # Look for name *after* govt heading
                 if gov_found and len(clean.split()) >= 2:
-                    # Accept if line has mostly lowercase or title case
                     if clean == clean.title() or clean == clean.lower():
-                        name = clean
+                        name = clean.title()
                         break
 
-            # Extract DOB
-            for _, line in boxes:
+            for line in text_lines:
                 match = re.search(r"\d{2}[/-]\d{2}[/-]\d{4}", line)
                 if match:
                     dob = match.group()
                     break
 
-            # Extract Gender
-            for _, line in boxes:
+            for line in text_lines:
                 if re.search(r"\bmale\b|\bpurush\b", line, re.IGNORECASE):
                     gender = "Male"
                 elif re.search(r"\bfemale\b|\bnari\b", line, re.IGNORECASE):
@@ -56,93 +61,76 @@ def extract_document_data(image_path, selected_doc_type):
 
             address = "Not available"
 
-        # === PAN Card Logic (Untouched) ===
+        # === PAN Logic ===
         elif doc_type == "PAN":
-            pan_index = -1
-            for i, (_, text) in enumerate(boxes):
-                match = re.search(r"\b[A-Z]{5}[0-9]{4}[A-Z]\b", text)
+            for i, line in enumerate(text_lines):
+                match = re.search(r"\b[A-Z]{5}[0-9]{4}[A-Z]\b", line)
                 if match:
                     pan_number = match.group()
-                    pan_index = i
-                    break
-
-            if pan_index != -1:
-                for i in range(pan_index + 1, len(boxes)):
-                    line = boxes[i][1]
-                    if re.search(r"[A-Z]{2,}", line) and not re.search(r"\d", line):
-                        if len(line.strip().split()) >= 2:
-                            name = line.strip()
-                            break
-
-            for i, (_, text) in enumerate(boxes):
-                if "father" in text.lower():
-                    for j in range(i + 1, len(boxes)):
-                        line = boxes[j][1]
-                        if re.search(r"[A-Z]{2,}", line) and not re.search(r"\d", line):
-                            if len(line.strip().split()) >= 2:
-                                father_name = line.strip()
+                    for j in range(i + 1, len(text_lines)):
+                        name_line = text_lines[j]
+                        if re.search(r"^[A-Z ]+$", name_line) and not re.search(r"\d", name_line):
+                            if len(name_line.strip().split()) >= 2:
+                                name = name_line.title().strip()
                                 break
                     break
 
-            for _, line in boxes:
+            for i, line in enumerate(text_lines):
+                if "father" in line.lower():
+                    for j in range(i + 1, len(text_lines)):
+                        fline = text_lines[j]
+                        if re.search(r"^[A-Z ]+$", fline) and not re.search(r"\d", fline):
+                            if len(fline.strip().split()) >= 2:
+                                father_name = fline.title().strip()
+                                break
+                    break
+
+            for line in text_lines:
                 match = re.search(r"\d{2}/\d{2}/\d{4}", line)
                 if match:
                     dob = match.group()
                     break
-            address = "Not availabe"
+            address = "Not available"
 
-        # === Passport Logic (Untouched) ===
+        # === Passport Logic ===
         elif doc_type == "Passport":
-            passport_number_pattern = r"\b[A-Z][0-9]{7}\b"
-            dob_pattern = r"\d{2}[-/]\d{2}[-/]\d{4}"
+            mrz_lines = [line.replace(" ", "") for line in text_lines if "<<" in line and len(line.replace(" ", "")) >= 40]
 
-            for i, (_, line) in enumerate(boxes):
-                # Passport Number
-                if not passport_number:
-                    match = re.search(passport_number_pattern, line)
-                    if match:
-                        passport_number = match.group()
+            if len(mrz_lines) >= 2:
+                mrz1 = mrz_lines[-2]
+                mrz2 = mrz_lines[-1]
 
-                # Nationality and Gender
-                if "INDIAN" in line.upper():
-                    nationality = "INDIAN"
-                if re.search(r"\b[M|F]\b", line):
-                    gender = re.search(r"\b[M|F]\b", line).group()
+                try:
+                    passport_number = mrz2[0:9].replace("<", "")
+                    nationality = mrz2[10:13].replace("<", "")
+                    dob_raw = mrz2[13:19]
+                    gender_code = mrz2[20]
+                    expiry_raw = mrz2[21:27]
 
-                # Date of Birth
-                if not dob:
-                    dob_match = re.search(dob_pattern, line)
+                    dob = format_mrz_date(dob_raw)
+                    date_of_expiry = format_mrz_date(expiry_raw)
+                    gender = {"M": "Male", "F": "Female"}.get(gender_code.upper(), "Unknown")
+
+                    name_parts = mrz1[5:].split("<<")
+                    surname = name_parts[0].replace("<", " ").strip().title()
+                    given_name = name_parts[1].replace("<", " ").strip().title() if len(name_parts) > 1 else ""
+                    name = f"{given_name} {surname}".strip()
+                except Exception as parse_error:
+                    print("Error parsing MRZ:", parse_error)
+
+            # Fallback date parsing
+            date_pattern = r"\d{2}[-/]\d{2}[-/]\d{4}"
+            for line in text_lines:
+                match = re.findall(date_pattern, line)
+                if len(match) >= 2:
+                    date_of_issue, date_of_expiry = match[:2]
+                    break
+                elif not dob:
+                    dob_match = re.search(date_pattern, line)
                     if dob_match:
                         dob = dob_match.group()
 
-                # Place of Birth (comma separated all caps line)
-                if ',' in line and line.upper() == line and not re.search(r'\d', line):
-                    place_of_birth = line.strip()
-
-                # Place of Issue (usually same format, below Place of Birth)
-                if not place_of_issue and place_of_birth and i > 0:
-                    next_line = boxes[i + 1][1] if i + 1 < len(boxes) else ''
-                    if next_line.upper() == next_line and not re.search(r'\d', next_line):
-                        place_of_issue = next_line.strip()
-
-                # Date of Issue & Expiry
-                date_matches = re.findall(dob_pattern, line)
-                if len(date_matches) == 2:
-                    date_of_issue, date_of_expiry = date_matches
-
-            # Given Name & Surname Logic
-            for i, (_, line) in enumerate(boxes):
-                if "surname" in line.lower():
-                    if i + 1 < len(boxes):
-                        surname = boxes[i + 1][1].strip()
-                if "given" in line.lower():
-                    if i + 1 < len(boxes):
-                        given_name = boxes[i + 1][1].strip()
-
-            # Assign name as "GIVEN SURNAME"
-            name = f"{given_name} {surname}".strip()
-
-        # === Fallbacks ===
+        # === Fallback Defaults ===
         if not aadhaar_number: aadhaar_number = '000000000000'
         if not pan_number: pan_number = 'AAAAA0000A'
         if not passport_number: passport_number = 'A0000000'
@@ -158,12 +146,17 @@ def extract_document_data(image_path, selected_doc_type):
             'PAN Number': pan_number,
             'Passport Number': passport_number,
             'Name': name,
-            'Father Name': father_name,
+            'Given Name': given_name,
+            'Surname': surname,
             'DOB': dob,
             'Gender': gender,
+            'Nationality': nationality,
+            'Date of Issue': date_of_issue,
+            'Date of Expiry': date_of_expiry,
+            'Father Name': father_name,
             'Address': address
         }
 
     except Exception as e:
-        print("EasyOCR Error:", e)
+        print("OCR Extraction Error:", e)
         return None
