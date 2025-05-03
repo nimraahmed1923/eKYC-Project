@@ -6,8 +6,6 @@ from datetime import datetime
 from extractor import extract_document_data
 from manage_db import insert_data, fetch_all_data
 from fingerprint_matcher import find_best_match
-from face_recognition_module import recognize_face
-
 
 def show_ocr_result(data):
     popup = Toplevel()
@@ -47,34 +45,21 @@ def show_ocr_result(data):
         ]
     elif doc_type == "passport":
         formatted_lines += [
-        f"{'Surname'.ljust(18)}: {data.get('Surname', '')}",
-        f"{'Given Name'.ljust(18)}: {data.get('Given Name', '')}",
-        f"{'DOB'.ljust(18)}: {data.get('DOB', '')}",
-        f"{'Gender'.ljust(18)}: {data.get('Gender', '')}",
-        f"{'Passport Number'.ljust(18)}: {data.get('Passport Number', '')}",
-        f"{'Nationality'.ljust(18)}: {data.get('Nationality', '')}",
-        
-        f"{'Date of Expiry'.ljust(18)}: {data.get('Date of Expiry', '')}"
-    ]
-    fallback = {"Unknown Name", "Unknown", "",
-                "01/01/1990",          # dummy DOB
-                "A0000000"}            # dummy passport #
-    suspicious = any(val in fallback
-                     for key, val in data.items()
-                     if key in {"Surname", "Given Name", "DOB",
-                                "Gender", "Passport Number",
-                                "Nationality", 
-                                "Date of Expiry"})
-
+            f"{'Surname'.ljust(18)}: {data.get('Surname', '')}",
+            f"{'Given Name'.ljust(18)}: {data.get('Given Name', '')}",
+            f"{'DOB'.ljust(18)}: {data.get('DOB', '')}",
+            f"{'Gender'.ljust(18)}: {data.get('Gender', '')}",
+            f"{'Passport Number'.ljust(18)}: {data.get('Passport Number', '')}",
+            f"{'Nationality'.ljust(18)}: {data.get('Nationality', '')}",
+            f"{'Date of Expiry'.ljust(18)}: {data.get('Date of Expiry', '')}"
+        ]
     
-
-    # Simple suspicious flag logic (if required field is missing)
-    # ---------------- Suspicious flag logic ---------------- #
+    # Suspicious flag logic
     def bad(val: str, bad_list: list[str]):
         """Return True if empty or in a list of fallback tokens."""
         return (not val) or (val.strip() in bad_list)
 
-    suspicious = False               # default
+    suspicious = False
 
     if doc_type == "aadhaar":
         suspicious = any([
@@ -83,7 +68,6 @@ def show_ocr_result(data):
             bad(data.get("Gender"),         ["Unknown"]),
             bad(data.get("Aadhaar Number"), ["000000000000"]),
         ])
-
     elif doc_type == "pan":
         suspicious = any([
             bad(data.get("Name"),        ["Unknown Name"]),
@@ -91,7 +75,6 @@ def show_ocr_result(data):
             bad(data.get("DOB"),         ["01/01/1990"]),
             bad(data.get("PAN Number"),  ["AAAAA0000A"]),
         ])
-
     elif doc_type == "passport":
         suspicious = any([
             bad(data.get("Surname"),          ["Unknown Name"]),
@@ -99,9 +82,7 @@ def show_ocr_result(data):
             bad(data.get("DOB"),              ["01/01/1990"]),
             bad(data.get("Passport Number"),  ["A0000000"]),
         ])
-    # ------------------------------------------------------- #
 
-    # rebuild the formatted text, now including Status line
     formatted_lines.append(f"{'Status'.ljust(18)}: {'Suspicious' if suspicious else 'Clear'}")
     
     formatted = "\n".join(formatted_lines)
@@ -131,7 +112,6 @@ def show_ocr_result(data):
     ttk.Button(controls, text="A+", width=4, command=increase_font).grid(row=0, column=1)
     ttk.Button(controls, text="A-", width=4, command=decrease_font).grid(row=0, column=2)
 
-
 class EKYCApp:
     def __init__(self, root):
         self.root = root
@@ -154,14 +134,13 @@ class EKYCApp:
         tk.Label(self.card_frame, text="Select Document Type", bg="white", fg="black", font=("Helvetica", 10)).pack(pady=(10, 5))
         self.doc_type_var = tk.StringVar()
         self.doc_type_var.set("Aadhaar")
-        ttk.OptionMenu(self.card_frame, self.doc_type_var, "Aadhaar", "Aadhaar", "PAN", "Passport").pack(pady=(0, 10))
+        ttk.OptionMenu(self.card_frame, self.doc_type_var, "Aadhaar", "Aadhaar", "PAN", "Passport").pack(pady=(0, 5))
 
         ttk.Button(self.card_frame, text="1. Extract Document Data (OCR)", command=self.ocr).pack(pady=5)
         ttk.Button(self.card_frame, text="2. Show Stored eKYC Data", command=self.show_data).pack(pady=5)
         ttk.Button(self.card_frame, text="3. Match Fingerprint", command=self.match_fingerprint).pack(pady=5)
-        ttk.Button(self.card_frame, text="4. Match Face", command=self.match_face).pack(pady=5)
-        ttk.Button(self.card_frame, text="5. Export All eKYC to CSV", command=self.export_to_csv).pack(pady=5)
-        ttk.Button(self.card_frame, text="6. Exit", command=root.quit).pack(pady=10)
+        ttk.Button(self.card_frame, text="4. Export All eKYC to CSV", command=self.export_csv).pack(pady=5)
+        ttk.Button(self.card_frame, text="5. Exit", command=root.quit).pack(pady=10)
 
         self.toggle_frame = tk.Frame(root, bg=self.bg_color)
         self.toggle_frame.pack(pady=10)
@@ -192,11 +171,17 @@ class EKYCApp:
         self.setup_styles()
         self.root.configure(bg=self.bg_color)
         self.theme_label.configure(text="Dark Mode" if self.theme == "dark" else "Light Mode", bg=self.bg_color, fg=self.fg_color)
+        self.toggle_frame.configure(bg=self.bg_color)
+        self.card_frame.configure(bg="white" if self.theme == "light" else "#3c3f41")
+        self.header_frame.configure(bg="#00a8a8")  # Keep header color consistent
+        for widget in self.card_frame.winfo_children():
+            if isinstance(widget, tk.Label):
+                widget.configure(bg="white" if self.theme == "light" else "#3c3f41", fg=self.fg_color)
 
     def ocr(self):
         file_path = filedialog.askopenfilename(title="Select Document Image", filetypes=[("Image Files", "*.png *.jpg *.jpeg")])
         if file_path:
-            selected_type = self.doc_type_var.get()  # FIXED LINE HERE
+            selected_type = self.doc_type_var.get()
             try:
                 data = extract_document_data(file_path, selected_type)
                 insert_data(data)
@@ -208,65 +193,93 @@ class EKYCApp:
 
     def show_data(self):
         rows = fetch_all_data()
-        display = "\n\n".join([str(row) for row in rows]) or "No data found."
-        messagebox.showinfo("Stored eKYC Data", display)
 
-    def match_fingerprint(self):
+        win = tk.Toplevel(self.root)
+        win.title("Stored eKYC Data")
+        win.geometry("1200x400")
+
+        columns = [
+            "ID", "Document Type", "Name", "Father Name", "DOB", "Gender",
+            "Aadhaar", "PAN", "Passport", "Nationality", 
+        ]
+        tree = ttk.Treeview(win, columns=columns, show="headings")
+
+        for col in columns:
+            tree.heading(col, text=col)
+            tree.column(col, width=120)
+
+        for row in rows:
+            tree.insert("", tk.END, values=row)
+
+        tree.pack(fill=tk.BOTH, expand=True)
+
+
+
+        # Add vertical scrollbar
+        scrollbar = Scrollbar(win, orient="vertical", command=tree.yview)
+        tree.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y")
+        tree.pack(expand=True, fill="both", padx=10, pady=10)
+
+        
+
+    def match_fingerprint(self): 
         file_path = filedialog.askopenfilename(title="Select Test Fingerprint Image", filetypes=[("BMP Files", "*.bmp")])
-        if file_path:
-            dataset = os.path.join("dataset_FVC2000_DB4_B", "dataset", "train_data")
-            best_match, score = find_best_match(file_path, dataset)
-            if best_match and score >= 15:
-                match_id = os.path.splitext(os.path.basename(best_match))[0]
-                rows = fetch_all_data()
-                matched_row = next((row for row in rows if any(match_id in str(field) for field in row)), None)
-                if matched_row:
-                    name = matched_row[5] if len(matched_row) > 5 else "Unknown"
-                    aadhaar = matched_row[2] if len(matched_row) > 2 else "Unknown"
-                    pan = matched_row[3] if len(matched_row) > 3 else "Unknown"
-                    address = matched_row[8] if len(matched_row) > 8 else "Unknown"
-                    display = f"Fingerprint matched with record:\n\nName: {name}\nAadhaar: {aadhaar}\nPAN: {pan}\nAddress: {address}"
-                    messagebox.showinfo("Fingerprint Match", display)
+        if not file_path:
+            messagebox.showwarning("Cancelled", "No file selected.")
+            return
+
+        dataset = os.path.join("dataset_FVC2000_DB4_B", "dataset", "train_data")
+        best_match, score = find_best_match(file_path, dataset)
+        if best_match and score >= 15:
+            match_id = os.path.splitext(os.path.basename(best_match))[0]
+            rows = fetch_all_data()
+            matched_row = next((row for row in rows if any(match_id in str(field) for field in row)), None)
+
+            if matched_row:
+                document_type = matched_row[1]
+                name = matched_row[2] if len(matched_row) > 2 else "Unknown"
+                dob = matched_row[4] if len(matched_row) > 4 else "Unknown"
+                aadhaar = matched_row[6] if len(matched_row) > 6 else "Unknown"
+                pan = matched_row[7] if len(matched_row) > 7 else "Unknown"
+                passport_number = matched_row[8] if len(matched_row) > 8 else "Unknown"
+
+                if document_type == "Aadhaar":
+                    display = f"Fingerprint matched with Aadhaar record:\n\nName: {name}\nDOB: {dob}\nAadhaar Number: {aadhaar}"
+                elif document_type == "PAN":
+                    display = f"Fingerprint matched with PAN record:\n\nName: {name}\nDOB: {dob}\nPan Number: {pan}"
+                elif document_type == "Passport":
+                    display = f"Fingerprint matched with Passport record:\n\nName: {name}\nDOB: {dob}\nPassport number: {passport_number}"
+
                 else:
-                    messagebox.showinfo("Fingerprint Match", f"Match found: {best_match}\nScore: {score}\nBut no linked eKYC record found.")
-            else:
-                messagebox.showwarning("Fingerprint Match", "No strong fingerprint match found.")
-        else:
-            messagebox.showwarning("Cancelled", "No file selected.")
+                    display = f"Fingerprint matched with record:\n\nName: {name}\nDOB: {dob}"
 
-    def match_face(self):
-        file_path = filedialog.askopenfilename(title="Select Test Face Image", filetypes=[("Image Files", "*.jpg *.jpeg *.png")])
-        if file_path:
-            known_faces = os.path.join("dataset", "faces")
-            result = recognize_face(file_path, known_faces)
-            if result:
-                messagebox.showinfo("Face Match", f"Face matched with: {result}")
+                messagebox.showinfo("Fingerprint Match", display)
             else:
-                messagebox.showwarning("Face Match", "No face matched.")
+                messagebox.showinfo("Fingerprint Match", f"Match found: {best_match}\nScore: {score}\nBut no linked eKYC record found.")
         else:
-            messagebox.showwarning("Cancelled", "No file selected.")
+            messagebox.showwarning("Fingerprint Match", "No strong fingerprint match found.")
 
-    def export_to_csv(self):
+    def export_csv(self):
         rows = fetch_all_data()
         if not rows:
-            messagebox.showinfo("Export", "No data to export.")
+            messagebox.showinfo("No Data", "No data available to export.")
             return
-        now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        default_filename = f"ekyc_export_{now}.csv"
-        file_path = filedialog.asksaveasfilename(defaultextension=".csv", initialfile=default_filename,
-                                                 filetypes=[("CSV files", "*.csv")], title="Save eKYC Data As")
-        if file_path:
-            try:
-                with open(file_path, mode='w', newline='', encoding='utf-8') as f:
-                    writer = csv.writer(f)
-                    writer.writerow(["ID", "Document Type", "Aadhaar", "PAN", "Passport", "Name", "DOB", "Gender", "Address"])
-                    writer.writerows(rows)
-                messagebox.showinfo("Export Success", f"eKYC data exported to:\n{file_path}")
-            except Exception as e:
-                messagebox.showerror("Export Error", str(e))
-        else:
-            messagebox.showwarning("Cancelled", "Export cancelled.")
-        
+
+        file_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files", "*.csv")], title="Save eKYC Data")
+        if not file_path:
+            return
+
+        with open(file_path, mode='w', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerow([
+                "ID", "Document Type", "Name", "Father Name", "DOB", "Gender",
+                "Aadhaar", "PAN", "Passport", "Nationality", "Place of Birth",
+                "Place of Issue", "Date of Issue", "Date of Expiry", "Status", "Timestamp"
+            ])
+            writer.writerows(rows)
+
+        messagebox.showinfo("Success", f"Data exported to {file_path}")
 
 
 if __name__ == "__main__":

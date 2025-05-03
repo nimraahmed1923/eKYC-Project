@@ -1,65 +1,76 @@
-
 import sqlite3
 
-def insert_data(data):
-    conn = sqlite3.connect("ekyc.db")
+def init_db():
+    """Initialize the database and create the eKYC table if it doesn't exist."""
+    conn = sqlite3.connect('ekyc_database.db')
     cursor = conn.cursor()
-
-    # Create table if it doesn't exist
-    cursor.execute("""
+    cursor.execute('''
         CREATE TABLE IF NOT EXISTS ekyc_data (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             document_type TEXT,
+            name TEXT,
+            father_name TEXT,
+            dob TEXT,
+            gender TEXT,
             aadhaar_number TEXT,
             pan_number TEXT,
             passport_number TEXT,
-            name TEXT,
-            father_name TEXT,
-            address TEXT
+            nationality TEXT,
+            place_of_birth TEXT,
+            place_of_issue TEXT,
+            date_of_issue TEXT,
+            date_of_expiry TEXT,
+            status TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
-    """)
+    ''')
+    conn.commit()
+    conn.close()
 
-    # Delete any existing record with the same unique ID
-    if data['Document Type'] == "Aadhaar":
-        cursor.execute("DELETE FROM ekyc_data WHERE aadhaar_number = :Aadhaar_Number", {
-            "Aadhaar_Number": data['Aadhaar Number']
-        })
-    elif data['Document Type'] == "PAN":
-        cursor.execute("DELETE FROM ekyc_data WHERE pan_number = :PAN_Number", {
-            "PAN_Number": data['PAN Number']
-        })
-    elif data['Document Type'] == "Passport":
-        cursor.execute("DELETE FROM ekyc_data WHERE passport_number = :Passport_Number", {
-            "Passport_Number": data['Passport Number']
-        })
-
-    # Insert new data using named bindings
-    cursor.execute("""
+def insert_data(data):
+    """Insert extracted data into the database."""
+    conn = sqlite3.connect('ekyc_database.db')
+    cursor = conn.cursor()
+    
+    # Prepare the data dictionary with default empty strings for missing fields
+    db_data = {
+        'document_type': data.get('Document Type', ''),
+        'name': data.get('Name', '') or data.get('Given Name', '') or data.get('Surname', ''),
+        'father_name': data.get('Father Name', ''),
+        'dob': data.get('DOB', ''),
+        'gender': data.get('Gender', ''),
+        'aadhaar_number': data.get('Aadhaar Number', ''),
+        'pan_number': data.get('PAN Number', ''),
+        'passport_number': data.get('Passport Number', ''),
+        'nationality': data.get('Nationality', ''),
+        'place_of_birth': data.get('Place of Birth', ''),
+        'place_of_issue': data.get('Place of Issue', ''),
+        'date_of_issue': data.get('Date of Issue', ''),
+        'date_of_expiry': data.get('Date of Expiry', ''),
+        'status': 'Suspicious' if data.get('status', 'Clear') == 'Suspicious' else 'Clear'
+    }
+    
+    cursor.execute('''
         INSERT INTO ekyc_data (
-            document_type, aadhaar_number, pan_number, passport_number,
-            name, father_name, address
-        ) VALUES (
-            :Document_Type, :Aadhaar_Number, :PAN_Number, :Passport_Number,
-            :Name, :Father_Name, :Address
-        )
-    """, {
-        "Document_Type": data['Document Type'],
-        "Aadhaar_Number": data['Aadhaar Number'],
-        "PAN_Number": data['PAN Number'],
-        "Passport_Number": data['Passport Number'],
-        "Name": data['Name'],
-        "Father_Name": data['Father Name'],
-        "Address": data['Address']
-    })
-
+            document_type, name, father_name, dob, gender, aadhaar_number, pan_number,
+            passport_number, nationality, place_of_birth, place_of_issue, date_of_issue,
+            date_of_expiry, status
+        ) VALUES (:document_type, :name, :father_name, :dob, :gender, :aadhaar_number,
+                  :pan_number, :passport_number, :nationality, :place_of_birth, :place_of_issue,
+                  :date_of_issue, :date_of_expiry, :status)
+    ''', db_data)
+    
     conn.commit()
     conn.close()
 
 def fetch_all_data():
-    conn = sqlite3.connect("ekyc.db")
+    """Fetch all records from the database."""
+    conn = sqlite3.connect('ekyc_database.db')
     cursor = conn.cursor()
-
-    cursor.execute("SELECT * FROM ekyc_data")
+    cursor.execute('SELECT * FROM ekyc_data')
     rows = cursor.fetchall()
-
     conn.close()
     return rows
+
+# Initialize the database when the module is imported
+init_db()
