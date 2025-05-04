@@ -6,6 +6,8 @@ from datetime import datetime
 from extractor import extract_document_data
 from manage_db import insert_data, fetch_all_data
 from fingerprint_matcher import find_best_match
+from PIL import Image, ImageTk
+
 
 def show_ocr_result(data):
     popup = Toplevel()
@@ -226,39 +228,95 @@ class EKYCApp:
     def match_fingerprint(self): 
         file_path = filedialog.askopenfilename(title="Select Test Fingerprint Image", filetypes=[("BMP Files", "*.bmp")])
         if not file_path:
-            messagebox.showwarning("Cancelled", "No file selected.")
-            return
+           messagebox.showwarning("Cancelled", "No file selected.")
+           return
 
         dataset = os.path.join("dataset_FVC2000_DB4_B", "dataset", "train_data")
         best_match, score = find_best_match(file_path, dataset)
+
         if best_match and score >= 15:
             match_id = os.path.splitext(os.path.basename(best_match))[0]
             rows = fetch_all_data()
             matched_row = next((row for row in rows if any(match_id in str(field) for field in row)), None)
 
             if matched_row:
-                document_type = matched_row[1]
-                name = matched_row[2] if len(matched_row) > 2 else "Unknown"
-                dob = matched_row[4] if len(matched_row) > 4 else "Unknown"
-                aadhaar = matched_row[6] if len(matched_row) > 6 else "Unknown"
-                pan = matched_row[7] if len(matched_row) > 7 else "Unknown"
-                passport_number = matched_row[8] if len(matched_row) > 8 else "Unknown"
+                doc_type = matched_row[1]
+                name = matched_row[2]
+                father_name = matched_row[3]
+                dob = matched_row[4]
+                gender = matched_row[5]
+                aadhaar = matched_row[6]
+                pan = matched_row[7]
+                passport = matched_row[8]
+                nationality = matched_row[9]
+                timestamp = matched_row[15]
+                status = matched_row[14]
+                popup = tk.Toplevel(self.root)
+                popup.title("Fingerprint Match")
+                popup.geometry("400x400")
+                popup.resizable(False, False)
 
-                if document_type == "Aadhaar":
-                    display = f"Fingerprint matched with Aadhaar record:\n\nName: {name}\nDOB: {dob}\nAadhaar Number: {aadhaar}"
-                elif document_type == "PAN":
-                    display = f"Fingerprint matched with PAN record:\n\nName: {name}\nDOB: {dob}\nPan Number: {pan}"
-                elif document_type == "Passport":
-                    display = f"Fingerprint matched with Passport record:\n\nName: {name}\nDOB: {dob}\nPassport number: {passport_number}"
+                label_tick = tk.Label(popup, text="✅", font=("Arial", 40), fg="green")
+                label_tick.pack(pady=(20, 5))
 
-                else:
-                    display = f"Fingerprint matched with record:\n\nName: {name}\nDOB: {dob}"
+                title_label = tk.Label(popup, text="Fingerprint Matched Successfully!", font=("Arial", 14, "bold"))
+                title_label.pack(pady=(0, 15))
 
-                messagebox.showinfo("Fingerprint Match", display)
+                info_frame = tk.Frame(popup)
+                info_frame.pack(padx=20, anchor="w")
+
+               
+
+                def add_label(field, value):
+                    label = tk.Label(info_frame, text=f"{field}: {value}", font=("Arial", 11))
+                    label.pack(anchor="w", pady=2)
+
+            # Add fields based on document type
+                add_label("Document Type", doc_type)
+                add_label("Name", name)
+
+                if doc_type == "Aadhaar":
+                    add_label("Date of Birth", dob)
+                    add_label("Gender", gender)
+                    add_label("Aadhaar Number", aadhaar)
+                    add_label("Match Score", f"{score:.2f}/500")
+                    add_label("Timestamp", timestamp)
+                    add_label("Status", status)
+
+                elif doc_type == "PAN":
+                    add_label("Date of Birth", dob)
+                    add_label("Father's Name", father_name)
+                    add_label("PAN Number", pan)
+                    add_label("Match Score", f"{score:.2f}/500")
+
+                elif doc_type == "Passport":
+                    add_label("Date of Birth", dob)
+                    add_label("Gender", gender)
+                    add_label("Passport Number", passport)
+                    add_label("Nationality", nationality)
+                    add_label("Match Score", f"{score:.2f}/500")
+                    add_label("Timestamp", timestamp)
+                    add_label("Status", status)
+               
+    
+
+         # Copy to Clipboard
+                def copy_to_clipboard():
+                    text = "\n".join(f"{child.cget('text')}" for child in info_frame.winfo_children())
+                    self.root.clipboard_clear()
+                    self.root.clipboard_append(text)
+                    self.root.update()
+                    messagebox.showinfo("Copied", "Details copied to clipboard.")
+
+                btn_copy = ttk.Button(popup, text="Copy to Clipboard", command=copy_to_clipboard)
+                btn_copy.pack(pady=20)
+
             else:
-                messagebox.showinfo("Fingerprint Match", f"Match found: {best_match}\nScore: {score}\nBut no linked eKYC record found.")
+                 messagebox.showinfo("Fingerprint Match", f"Match found: {best_match}\nScore: {score}\nBut no linked eKYC record found.")
         else:
             messagebox.showwarning("Fingerprint Match", "No strong fingerprint match found.")
+
+
 
     def export_csv(self):
         rows = fetch_all_data()
@@ -266,20 +324,32 @@ class EKYCApp:
             messagebox.showinfo("No Data", "No data available to export.")
             return
 
-        file_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files", "*.csv")], title="Save eKYC Data")
+    # Generate a default filename with current timestamp
+        now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        default_filename = f"ekyc_export_{now}.csv"
+
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".csv",
+            initialfile=default_filename,
+            filetypes=[("CSV files", "*.csv")],
+            title="Save eKYC Data"
+        )
         if not file_path:
             return
 
-        with open(file_path, mode='w', newline='', encoding='utf-8') as f:
-            writer = csv.writer(f)
-            writer.writerow([
-                "ID", "Document Type", "Name", "Father Name", "DOB", "Gender",
-                "Aadhaar", "PAN", "Passport", "Nationality", "Place of Birth",
-                "Place of Issue", "Date of Issue", "Date of Expiry", "Status", "Timestamp"
-            ])
-            writer.writerows(rows)
+        try:
+            with open(file_path, mode='w', newline='', encoding='utf-8') as f:
+                 writer = csv.writer(f)
+                 writer.writerow([
+                     "ID", "Document Type", "Name", "Father Name", "DOB", "Gender",
+                     "Aadhaar", "PAN", "Passport", "Nationality", "Place of Birth",
+                     "Place of Issue", "Date of Issue", "Date of Expiry", "Status", "Timestamp"
+                 ])
+                 writer.writerows(rows)
 
-        messagebox.showinfo("Success", f"Data exported to {file_path}")
+            messagebox.showinfo("Success", f"Data exported to {file_path}")
+        except Exception as e:
+            messagebox.showerror("Export Error", str(e))
 
 
 if __name__ == "__main__":
