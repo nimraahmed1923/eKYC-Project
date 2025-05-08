@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import messagebox, filedialog, ttk, Toplevel, Text, Scrollbar
+from tkinter import messagebox, filedialog, ttk, Toplevel, Text, Scrollbar,Label,Button
 import os
 import csv
 from datetime import datetime
@@ -7,6 +7,7 @@ from extractor import extract_document_data
 from manage_db import insert_data, fetch_all_data
 from fingerprint_matcher import find_best_match
 from fraud_predictor import predict_fraud
+
 
 
 def show_ocr_result(data):
@@ -223,7 +224,26 @@ class EKYCApp:
         scrollbar.pack(side="right", fill="y")
         tree.pack(expand=True, fill="both", padx=10, pady=10)
 
-        
+    def show_suspicious_popup(self):
+        popup = tk.Toplevel()
+        popup.title("Suspicious Fingerprint Match")
+        popup.geometry("400x300")
+        popup.resizable(False, False)
+
+    # ⚠️ Warning icon
+        Label(popup, text="⚠️", font=("Segoe UI Emoji", 48)).pack(pady=10)
+
+    # Warning message
+        msg = (
+            "This fingerprint is not linked to any enrolled identity.\n"
+            "Either it is not stored or the match is invalid.\n"
+            "Please verify and try again."
+        )
+        Label(popup, text=msg, font=("Arial", 12), justify="center", wraplength=360).pack(pady=10)
+
+    # OK button
+        Button(popup, text="OK", width=20, command=popup.destroy).pack(pady=20)
+    
 
     def match_fingerprint(self): 
         file_path = filedialog.askopenfilename(title="Select Test Fingerprint Image", filetypes=[("BMP Files", "*.bmp")])
@@ -306,6 +326,7 @@ class EKYCApp:
                 }
                 fraud_status = predict_fraud(entry)
                 add_label("Predicted Status", fraud_status)
+     
             
          # Copy to Clipboard
                 def copy_to_clipboard():
@@ -317,9 +338,9 @@ class EKYCApp:
 
                 btn_copy = ttk.Button(popup, text="Copy to Clipboard", command=copy_to_clipboard)
                 btn_copy.pack(pady=20)
-
-            else:
-                 messagebox.showinfo("Fingerprint Match", f"Match found: {best_match}\nScore: {score}\nBut no linked eKYC record found.")
+            else:  
+                 self.show_suspicious_popup()
+            
         else:
             messagebox.showinfo("No Match", "No fingerprint match found or score too low.")  
 
