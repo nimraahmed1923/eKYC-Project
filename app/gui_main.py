@@ -10,6 +10,7 @@ from fraud_predictor import predict_fraud
 
 
 
+
 def show_ocr_result(data):
     popup = Toplevel()
     popup.title("OCR Extraction Result")
@@ -378,8 +379,55 @@ class EKYCApp:
         except Exception as e:
             messagebox.showerror("Export Error", str(e))
 
+def validate_login(role, username, password, login_window):
+                if role == "Admin" and username == "admin" and password == "admin123":
+                    login_window.destroy()
+                    root = tk.Tk()
+                    app = EKYCApp(root)
+                    root.mainloop()
+                elif role == "Employee" and username == "employee" and password == "emp123":
+                     login_window.destroy()
+                     root = tk.Tk()
+                     app = EKYCApp(root)
+                     root.mainloop()
+                else:
+                    messagebox.showerror("Login Failed", "Invalid credentials. Please try again.")
+
+def show_login_screen():
+                login_window = tk.Tk()
+                login_window.title("eKYC Login")
+                login_window.geometry("400x300")
+                login_window.configure(bg="#f0f0f0")
+                login_window.resizable(False, False)
+
+                tk.Label(login_window, text="eKYC System Login", font=("Helvetica", 16, "bold"), bg="#f0f0f0").pack(pady=20)
+
+                role_var = tk.StringVar(value="Employee")
+                username_var = tk.StringVar()
+                password_var = tk.StringVar()
+
+                tk.Label(login_window, text="Select Role:", bg="#f0f0f0").pack(pady=(5, 0))
+                ttk.Combobox(login_window, textvariable=role_var, values=["Admin", "Employee"], state="readonly").pack(pady=5)
+
+                tk.Label(login_window, text="Username:", bg="#f0f0f0").pack(pady=(10, 0))
+                username_entry = ttk.Entry(login_window, textvariable=username_var)
+                username_entry.pack()
+
+                tk.Label(login_window, text="Password:", bg="#f0f0f0").pack(pady=(10, 0))
+                password_entry = ttk.Entry(login_window, textvariable=password_var, show="*")
+                password_entry.pack()
+
+                ttk.Button(
+                    login_window,
+                    text="Login",
+                    command=lambda: validate_login(role_var.get(), username_var.get(), password_var.get(), login_window)
+                ).pack(pady=20)
+
+                login_window.mainloop()
 
 if __name__ == "__main__":
+    show_login_screen()
+if __name__ == "__main__":    
     root = tk.Tk()
     app = EKYCApp(root)
     root.mainloop()
