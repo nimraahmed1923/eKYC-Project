@@ -6,7 +6,7 @@ from datetime import datetime
 from extractor import extract_document_data
 from manage_db import insert_data, fetch_all_data
 from fingerprint_matcher import find_best_match
-from PIL import Image, ImageTk
+from fraud_predictor import predict_fraud
 
 
 def show_ocr_result(data):
@@ -251,6 +251,7 @@ class EKYCApp:
                 nationality = matched_row[9]
                 timestamp = matched_row[15]
                 status = matched_row[14]
+                
                 popup = tk.Toplevel(self.root)
                 popup.title("Fingerprint Match")
                 popup.geometry("400x400")
@@ -297,9 +298,15 @@ class EKYCApp:
                     add_label("Match Score", f"{score:.2f}/500")
                     add_label("Timestamp", timestamp)
                     add_label("Status", status)
-               
-    
-
+                entry = {    
+                    'aadhaar_number': aadhaar or '',
+                    'pan_number': pan or '',
+                    'passport_number': passport or '',
+                    'fingerprint_score': score
+                }
+                fraud_status = predict_fraud(entry)
+                add_label("Predicted Status", fraud_status)
+            
          # Copy to Clipboard
                 def copy_to_clipboard():
                     text = "\n".join(f"{child.cget('text')}" for child in info_frame.winfo_children())
@@ -314,8 +321,7 @@ class EKYCApp:
             else:
                  messagebox.showinfo("Fingerprint Match", f"Match found: {best_match}\nScore: {score}\nBut no linked eKYC record found.")
         else:
-            messagebox.showwarning("Fingerprint Match", "No strong fingerprint match found.")
-
+            messagebox.showinfo("No Match", "No fingerprint match found or score too low.")  
 
 
     def export_csv(self):
@@ -343,7 +349,7 @@ class EKYCApp:
                  writer.writerow([
                      "ID", "Document Type", "Name", "Father Name", "DOB", "Gender",
                      "Aadhaar", "PAN", "Passport", "Nationality", "Place of Birth",
-                     "Place of Issue", "Date of Issue", "Date of Expiry", "Status", "Timestamp"
+                     "Place of Issue", "Date of Issue", "Date of Expiry", "Status", "Timestamp","Fingerprint Score", "Predicted Status"
                  ])
                  writer.writerows(rows)
 
