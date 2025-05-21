@@ -1,4 +1,4 @@
-ID,Document Type,Name,Father Name,DOB,Gender,Aadhaar,PAN,Passport,Nationality,Status,Timestamp
+ID,Document Type,Name,Father Name,DOB,Gender,Aadhaar,PAN,Passport,Nationality,Place of Birth,Place of Issue,Date of Issue,Date of Expiry,Status,Timestamp,Fingerprint Score,Predicted Status
 1,Aadhaar,Anik Kumar,Unknown Father,03/02/2003,Male,292386612346,AAAAA0000A,A0000000,,,,,,Clear,2025-05-02 05:41:01
 2,PAN,Saifali Ansari,Manzoor Hasan Ansari,17/04/1999,Unknown,000000000000,CKCPA4252N,A0000000,,,,,,Clear,2025-05-02 05:41:17
 3,Passport,Kopal Gupta,Unknown Father,10/06/1986,Female,000000000000,AAAAA0000A,01242853,InD,,,,29/07/2025,Clear,2025-05-02 05:41:30
@@ -14,3 +14,6 @@ ID,Document Type,Name,Father Name,DOB,Gender,Aadhaar,PAN,Passport,Nationality,St
 13,PAN,Saifali Ansari,Manzoor Hasan Ansari,17/04/1999,Unknown,000000000000,CKCPA4252N,A0000000,,,,,,Clear,2025-05-03 11:01:51
 14,PAN,Unknown Name,Unknown Father,01/01/1990,Unknown,000000000000,AAAAA0000A,A0000000,,,,,,Clear,2025-05-03 11:04:48
 15,Passport,Kopal Gupta,Unknown Father,10/06/1986,Female,000000000000,AAAAA0000A,01242853,InD,,,,29/07/2025,Clear,2025-05-03 11:05:03
+16,Aadhaar,Anik Kumar,Unknown Father,03/02/2003,Male,292386612346,AAAAA0000A,A0000000,,,,,,Clear,2025-05-04 14:05:34
+17,Aadhaar,Varun Kumar Gera,Unknown Father,24/07/2003,Male,263741255075,AAAAA0000A,A0000000,,,,,,Clear,2025-05-04 14:48:28
+18,Aadhaar,Anik Kumar,Unknown Father,03/02/2003,Male,292386612346,AAAAA0000A,A0000000,,,,,,Clear,2025-05-06 07:37:28

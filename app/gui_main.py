@@ -7,6 +7,8 @@ from extractor import extract_document_data
 from manage_db import insert_data, fetch_all_data
 from fingerprint_matcher import find_best_match
 from fraud_predictor import predict_fraud
+from manage_db import delete_user_by_id
+
 
 
 
@@ -224,6 +226,26 @@ class EKYCApp:
         tree.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side="right", fill="y")
         tree.pack(expand=True, fill="both", padx=10, pady=10)
+        # Delete button
+        def delete_selected_row():
+            selected_item = tree.selection()
+            if not selected_item:
+               messagebox.showwarning("Warning", "Please select a row to delete.")
+               return
+        
+            item = tree.item(selected_item)
+            row_values = item["values"]
+            user_id = row_values[0]  # Assuming first column is the unique ID
+
+        # Confirm before deletion
+            confirm = messagebox.askyesno("Confirm", f"Delete user ID {user_id}?")
+            if confirm:
+                delete_user_by_id(user_id)  # <-- Define this in your DB module
+                tree.delete(selected_item)
+                messagebox.showinfo("Deleted", f"User ID {user_id} deleted.")
+
+        delete_button = tk.Button(win, text="Delete Selected Row", command=delete_selected_row, bg="red", fg="white")
+        delete_button.pack(pady=10)
 
     def show_suspicious_popup(self):
         popup = tk.Toplevel()

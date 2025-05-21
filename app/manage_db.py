@@ -71,6 +71,12 @@ def fetch_all_data():
     rows = cursor.fetchall()
     conn.close()
     return rows
+def delete_user_by_id(user_id):
+    conn = sqlite3.connect("ekyc_database.db")
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM ekyc_data WHERE id = ?", (user_id,))
+    conn.commit()
+    conn.close()
 
 # Initialize the database when the module is imported
 init_db()
