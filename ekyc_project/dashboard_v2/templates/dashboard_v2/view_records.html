@@ -1,0 +1,32 @@
+{% extends "dashboard_v2/base.html" %}
+
+{% block content %}
+<h1 class="text-3xl font-bold mb-6">View Records</h1>
+
+<table class="min-w-full text-left">
+    <thead class="bg-gray-100">
+        <tr>
+            <th class="px-4 py-2">Name</th>
+            <th class="px-4 py-2">Aadhaar</th>
+            <th class="px-4 py-2">PAN</th>
+            <th class="px-4 py-2">Passport</th>
+            <th class="px-4 py-2">Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for record in records %}
+        <tr class="border-t">
+            <td class="px-4 py-2">{{ record.name }}</td>
+            <td class="px-4 py-2">{{ record.aadhaar_number }}</td>
+            <td class="px-4 py-2">{{ record.pan_number }}</td>
+            <td class="px-4 py-2">{{ record.passport_number }}</td>
+            <td class="px-4 py-2">{{ record.status }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="5" class="px-4 py-2 text-center">No records found.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

@@ -1,20 +1,35 @@
-
+<!-- Updated base.html -->
 <!DOCTYPE html>
 <html lang="en">
-{% load static %}
-
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>eKYC Admin Panel</title>
-  <link href="{% static 'css/dist/styles.css' %}" rel="stylesheet" />
+    <meta charset="UTF-8">
+    <title>eKYC Admin Panel</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body class="bg-gray-100 text-gray-800 font-sans leading-relaxed">
-  <header class="bg-indigo-600 text-white p-4 shadow-md sticky top-0 z-50">
-    <h1 class="text-2xl font-bold tracking-wide">eKYC Admin Dashboard</h1>
-  </header>
-  <div class="p-6">
-    {% block content %}{% endblock %}
-  </div>
+<body class="flex h-screen bg-gray-100">
+    <!-- Sidebar -->
+    <aside class="w-64 bg-blue-900 text-white flex flex-col">
+        <div class="p-6 text-xl font-bold border-b border-blue-800">eKYC Panel</div>
+        <nav class="flex-1 p-4 space-y-2">
+            <a href="{% url 'dashboard' %}" class="block px-4 py-2 rounded hover:bg-blue-700">Dashboard</a>
+           
+            <a href="{% url 'view_records' %}" class="block px-4 py-2 rounded hover:bg-blue-700">View Records</a>
+            <a href="{% url 'export_data' %}" class="block px-4 py-2 rounded hover:bg-blue-700">Export Data</a>
+            <a href="{% url 'aadhaar_list' %}" class="block px-4 py-2 rounded hover:bg-blue-700">Aadhaar List</a>
+            <a href="{% url 'pan_list' %}" class="block px-4 py-2 rounded hover:bg-blue-700">PAN List</a>
+            <a href="{% url 'passport_list' %}" class="block px-4 py-2 rounded hover:bg-blue-700">Passport List</a>
+        </nav>
+        <div class="p-4 border-t border-blue-800">
+            <p class="text-sm mb-2">Logged in as <span class="font-semibold">Ahmed</span></p>
+            <a href="/logout" class="inline-block w-full px-4 py-2 bg-red-600 text-white text-center rounded hover:bg-red-700">Logout</a>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="flex-1 p-8 overflow-y-auto">
+        {% block content %}{% endblock %}
+    </div>
 </body>
 </html>
+

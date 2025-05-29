@@ -2,7 +2,6 @@ from django.db import models
 
 class EkycData(models.Model):
     document_type = models.CharField(max_length=50, null=True, blank=True)
-
     name = models.CharField(max_length=100)
     father_name = models.CharField(max_length=100, blank=True, null=True)
     dob = models.CharField(max_length=20, blank=True, null=True)
@@ -16,4 +15,5 @@ class EkycData(models.Model):
     date_of_issue = models.CharField(max_length=20, blank=True, null=True)
     date_of_expiry = models.CharField(max_length=20, blank=True, null=True)
     status = models.CharField(max_length=20, default="Clear")
+    fraud_score = models.FloatField(default=0.0)  # ← add this line
     timestamp = models.DateTimeField(auto_now_add=True)

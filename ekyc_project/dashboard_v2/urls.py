@@ -1,10 +1,18 @@
 from django.urls import path
-from .views import dashboard_view, login_view, logout_view, home_view
+from . import views
 
 urlpatterns = [
-    path('', login_view, name='login'),             # Login view as homepage
-    path('login/', login_view, name='login'),       # Explicit login path
-    path('logout/', logout_view, name='logout'),    # Logout path
-    path('dashboard/', dashboard_view, name='dashboard'),# Correct dashboard view
-    path('home/', home_view, name='home'),          # Optional home page
+    path('', views.dashboard_view, name='dashboard'),
+    path('login/', views.login_view, name='login'),
+    path('logout/', views.logout_view, name='logout'),
+
+    
+    path('view-records/', views.view_records_view, name='view_records'),
+    path('export-data/', views.export_data_view, name='export_data'),
+
+    path('aadhaar-list/', views.aadhaar_list, name='aadhaar_list'),
+    path('pan-list/', views.pan_list, name='pan_list'),
+    path('passport-list/', views.passport_list, name='passport_list'),
+
+    path('delete-entry/<int:entry_id>/', views.delete_entry, name='delete_entry'),
 ]

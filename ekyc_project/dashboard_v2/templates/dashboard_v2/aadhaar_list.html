@@ -1,0 +1,36 @@
+{% extends 'dashboard_v2/base.html' %}
+
+{% block content %}
+<div class="bg-white p-6 rounded-lg shadow">
+    <div class="flex justify-between items-center mb-4">
+        <h2 class="text-2xl font-bold">Aadhaar Records</h2>
+        <form method="get" class="flex">
+            <input type="text" name="q" placeholder="Search by name..." class="border rounded-l px-3 py-1">
+            <button type="submit" class="bg-blue-500 text-white px-4 py-1 rounded-r hover:bg-blue-600">Search</button>
+        </form>
+    </div>
+
+    <div class="overflow-x-auto">
+        <table class="min-w-full text-left">
+            <thead class="bg-gray-100">
+                <tr>
+                    <th class="px-4 py-2">Name</th>
+                    <th class="px-4 py-2">Aadhaar Number</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in entries %}
+                <tr class="border-t hover:bg-gray-50">
+                    <td class="px-4 py-2">{{ entry.name }}</td>
+                    <td class="px-4 py-2">{{ entry.aadhaar_number }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="2" class="px-4 py-2 text-center text-gray-500">No Aadhaar records found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
