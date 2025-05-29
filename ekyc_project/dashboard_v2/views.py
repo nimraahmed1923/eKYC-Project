@@ -3,13 +3,12 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Q, Avg
 from django.http import HttpResponse
+from django.db.models import Q, Avg
 import csv
+import sqlite3
 from datetime import datetime
 import re
-
-from dashboard_v2.models import EkycData
 
 # ---------- AUTHENTICATION VIEWS ----------
 
@@ -58,66 +57,48 @@ def is_passport(val):
         )
     )
 
-# ---------- DASHBOARD VIEW ----------
+# ---------- DASHBOARD VIEW USING GUI DB ----------
+
+def fetch_ekyc_from_gui():
+    conn = sqlite3.connect('ekyc_database.db')
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM ekyc_data ORDER BY timestamp DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
 
 @login_required
 def dashboard_view(request):
-    query = request.GET.get('q', '').strip()
-    document_type = request.GET.get('doc_type', '')
-    status_filter = request.GET.get('status', '')
-    start_date = request.GET.get('start_date', '')
-    end_date = request.GET.get('end_date', '')
+    query = request.GET.get('q', '').strip().lower()
 
-    entries = EkycData.objects.all()
+    all_entries = fetch_ekyc_from_gui()
 
+    # Apply search filter manually
     if query:
-        entries = entries.filter(
-            Q(name__icontains=query) |
-            Q(aadhaar_number__icontains=query) |
-            Q(pan_number__icontains=query) |
-            Q(passport_number__icontains=query)
-        )
+        all_entries = [
+            e for e in all_entries if
+            query in (e['name'] or '').lower() or
+            query in (e['aadhaar_number'] or '').lower() or
+            query in (e['pan_number'] or '').lower() or
+            query in (e['passport_number'] or '').lower()
+        ]
 
-    if document_type:
-        entries = entries.filter(document_type__iexact=document_type)
+    total_records = len(all_entries)
+    aadhaar_count = sum(1 for e in all_entries if is_aadhaar(e.get('aadhaar_number')))
+    pan_count = sum(1 for e in all_entries if is_pan(e.get('pan_number')))
+    passport_count = sum(1 for e in all_entries if is_passport(e.get('passport_number')))
 
-    if status_filter:
-        entries = entries.filter(status__iexact=status_filter)
-
-    if start_date:
-        try:
-            start_dt = datetime.strptime(start_date, '%Y-%m-%d')
-            entries = entries.filter(timestamp__gte=start_dt)
-        except ValueError:
-            messages.warning(request, "Invalid start date format. Use YYYY-MM-DD.")
-
-    if end_date:
-        try:
-            end_dt = datetime.strptime(end_date, '%Y-%m-%d')
-            entries = entries.filter(timestamp__lte=end_dt)
-        except ValueError:
-            messages.warning(request, "Invalid end date format. Use YYYY-MM-DD.")
-
-    recent_entries = entries.order_by('-timestamp')[:100]
-
-    all_entries = EkycData.objects.all()
-    total_records = all_entries.count()
-    aadhaar_count = sum(1 for e in all_entries if is_aadhaar(e.aadhaar_number))
-    pan_count = sum(1 for e in all_entries if is_pan(e.pan_number))
-    passport_count = sum(1 for e in all_entries if is_passport(e.passport_number))
-
-    high_risk_count = all_entries.filter(fraud_score__gte=0.8).count()
-    medium_risk_count = all_entries.filter(fraud_score__gte=0.5, fraud_score__lt=0.8).count()
-    low_risk_count = all_entries.filter(fraud_score__lt=0.5).count()
-    average_fraud_score = all_entries.aggregate(avg=Avg('fraud_score'))['avg'] or 0
+    # Risk counts (using hardcoded logic based on status/fraud_score if available)
+    high_risk_count = sum(1 for e in all_entries if (e.get('fraud_score') or 0) >= 0.8)
+    medium_risk_count = sum(1 for e in all_entries if 0.5 <= (e.get('fraud_score') or 0) < 0.8)
+    low_risk_count = sum(1 for e in all_entries if (e.get('fraud_score') or 0) < 0.5)
+    scores = [e.get('fraud_score') for e in all_entries if e.get('fraud_score') is not None]
+    average_fraud_score = round(sum(scores) / len(scores) * 100, 2) if scores else 0
 
     context = {
+        'recent_entries': all_entries,  # Now shows ALL entries from GUI DB
         'query': query,
-        'document_type': document_type,
-        'status_filter': status_filter,
-        'start_date': start_date,
-        'end_date': end_date,
-        'recent_entries': recent_entries,
         'total_records': total_records,
         'aadhaar_count': aadhaar_count,
         'pan_count': pan_count,
@@ -125,9 +106,8 @@ def dashboard_view(request):
         'high_risk_count': high_risk_count,
         'medium_risk_count': medium_risk_count,
         'low_risk_count': low_risk_count,
-        'average_fraud_score': round(average_fraud_score * 100, 2),
+        'average_fraud_score': average_fraud_score,
     }
-
     return render(request, 'dashboard_v2/dashboard.html', context)
 
 
@@ -135,15 +115,18 @@ def dashboard_view(request):
 
 @login_required
 def delete_entry(request, entry_id):
-    entry = get_object_or_404(EkycData, id=entry_id)
-    entry.delete()
+    conn = sqlite3.connect('ekyc_database.db')
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM ekyc_data WHERE id = ?", (entry_id,))
+    conn.commit()
+    conn.close()
     messages.success(request, "Entry deleted successfully.")
     return redirect('dashboard')
 
 
 @login_required
 def view_records_view(request):
-    records = EkycData.objects.all().order_by('-timestamp')
+    records = fetch_ekyc_from_gui()
     return render(request, 'dashboard_v2/view_records.html', {'records': records})
 
 
@@ -151,51 +134,22 @@ def view_records_view(request):
 
 @login_required
 def export_data_view(request):
-    query = request.GET.get('q', '').strip()
-    document_type = request.GET.get('doc_type', '')
-    status_filter = request.GET.get('status', '')
-    start_date = request.GET.get('start_date', '')
-    end_date = request.GET.get('end_date', '')
-
-    entries = EkycData.objects.all()
-
-    if query:
-        entries = entries.filter(
-            Q(name__icontains=query) |
-            Q(aadhaar_number__icontains=query) |
-            Q(pan_number__icontains=query) |
-            Q(passport_number__icontains=query)
-        )
-
-    if document_type:
-        entries = entries.filter(document_type__iexact=document_type)
-
-    if status_filter:
-        entries = entries.filter(status__iexact=status_filter)
-
-    if start_date:
-        try:
-            start_dt = datetime.strptime(start_date, '%Y-%m-%d')
-            entries = entries.filter(timestamp__gte=start_dt)
-        except ValueError:
-            messages.warning(request, "Invalid start date format. Use YYYY-MM-DD.")
-
-    if end_date:
-        try:
-            end_dt = datetime.strptime(end_date, '%Y-%m-%d')
-            entries = entries.filter(timestamp__lte=end_dt)
-        except ValueError:
-            messages.warning(request, "Invalid end date format. Use YYYY-MM-DD.")
+    entries = fetch_ekyc_from_gui()
 
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = 'attachment; filename="ekyc_data_export.csv"'
-
     writer = csv.writer(response)
-    writer.writerow(['ID', 'Name', 'Document Type', 'Aadhaar Number', 'PAN Number', 'Passport Number', 'Status', 'Fraud Score', 'Timestamp'])
-
-    for row in entries.values_list('id', 'name', 'document_type', 'aadhaar_number', 'pan_number', 'passport_number', 'status', 'fraud_score', 'timestamp'):
-        writer.writerow(row)
-
+    writer.writerow([
+        'ID', 'Name', 'Document Type', 'Aadhaar Number', 'PAN Number',
+        'Passport Number', 'Status', 'Fraud Score', 'Timestamp'
+    ])
+    for e in entries:
+        writer.writerow([
+            e.get('id'), e.get('name'), e.get('document_type'),
+            e.get('aadhaar_number'), e.get('pan_number'),
+            e.get('passport_number'), e.get('status'),
+            e.get('fraud_score'), e.get('timestamp')
+        ])
     return response
 
 
@@ -203,37 +157,28 @@ def export_data_view(request):
 
 @login_required
 def aadhaar_list(request):
-    search_query = request.GET.get('q', '').strip()
-    entries = EkycData.objects.all()
-    entries = [e for e in entries if is_aadhaar(e.aadhaar_number)]
-
-    if search_query:
-        entries = [e for e in entries if search_query.lower() in e.name.lower() or search_query in (e.aadhaar_number or '')]
-
+    entries = [e for e in fetch_ekyc_from_gui() if is_aadhaar(e.get('aadhaar_number'))]
+    query = request.GET.get('q', '').lower()
+    if query:
+        entries = [e for e in entries if query in (e.get('name') or '').lower() or query in (e.get('aadhaar_number') or '').lower()]
     return render(request, 'dashboard_v2/aadhaar_list.html', {'entries': entries})
 
 
 @login_required
 def pan_list(request):
-    search_query = request.GET.get('q', '').strip()
-    entries = EkycData.objects.all()
-    entries = [e for e in entries if is_pan(e.pan_number)]
-
-    if search_query:
-        entries = [e for e in entries if search_query.lower() in e.name.lower() or search_query in (e.pan_number or '')]
-
+    entries = [e for e in fetch_ekyc_from_gui() if is_pan(e.get('pan_number'))]
+    query = request.GET.get('q', '').lower()
+    if query:
+        entries = [e for e in entries if query in (e.get('name') or '').lower() or query in (e.get('pan_number') or '').lower()]
     return render(request, 'dashboard_v2/pan_list.html', {'entries': entries})
 
 
 @login_required
 def passport_list(request):
-    search_query = request.GET.get('q', '').strip()
-    entries = EkycData.objects.all()
-    entries = [e for e in entries if is_passport(e.passport_number)]
-
-    if search_query:
-        entries = [e for e in entries if search_query.lower() in e.name.lower() or search_query in (e.passport_number or '')]
-
+    entries = [e for e in fetch_ekyc_from_gui() if is_passport(e.get('passport_number'))]
+    query = request.GET.get('q', '').lower()
+    if query:
+        entries = [e for e in entries if query in (e.get('name') or '').lower() or query in (e.get('passport_number') or '').lower()]
     return render(request, 'dashboard_v2/passport_list.html', {'entries': entries})
 
 
