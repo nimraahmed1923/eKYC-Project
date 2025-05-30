@@ -119,8 +119,9 @@ def show_ocr_result(data):
     ttk.Button(controls, text="A-", width=4, command=decrease_font).grid(row=0, column=2)
 
 class EKYCApp:
-    def __init__(self, root):
+    def __init__(self, root, role="Employee"):
         self.root = root
+        self.role = role
         self.root.title("eKYC Application")
         self.root.geometry("480x560")
         self.root.configure(bg="#f5f5f5")
@@ -143,9 +144,12 @@ class EKYCApp:
         ttk.OptionMenu(self.card_frame, self.doc_type_var, "Aadhaar", "Aadhaar", "PAN", "Passport").pack(pady=(0, 5))
 
         ttk.Button(self.card_frame, text="1. Extract Document Data (OCR)", command=self.ocr).pack(pady=5)
-        ttk.Button(self.card_frame, text="2. Show Stored eKYC Data", command=self.show_data).pack(pady=5)
-        ttk.Button(self.card_frame, text="3. Match Fingerprint", command=self.match_fingerprint).pack(pady=5)
-        ttk.Button(self.card_frame, text="4. Export All eKYC to CSV", command=self.export_csv).pack(pady=5)
+
+        if self.role == "Admin":
+            ttk.Button(self.card_frame, text="2. Show Stored eKYC Data", command=self.show_data).pack(pady=5)
+            ttk.Button(self.card_frame, text="3. Export All eKYC to CSV", command=self.export_csv).pack(pady=5)
+
+        ttk.Button(self.card_frame, text="4. Match Fingerprint", command=self.match_fingerprint).pack(pady=5)
         ttk.Button(self.card_frame, text="5. Exit", command=root.quit).pack(pady=10)
 
         self.toggle_frame = tk.Frame(root, bg=self.bg_color)
@@ -159,7 +163,6 @@ class EKYCApp:
             command=self.toggle_theme, variable=tk.IntVar(value=0)
         )
         self.theme_switch.pack(side="left", padx=10)
-
     def setup_styles(self):
         style = ttk.Style()
         style.theme_use('clam')
@@ -414,52 +417,51 @@ class EKYCApp:
             messagebox.showinfo("Success", f"Data exported to {file_path}")
         except Exception as e:
             messagebox.showerror("Export Error", str(e))
-
 def validate_login(role, username, password, login_window):
-                if role == "Admin" and username == "admin" and password == "admin123":
-                    login_window.destroy()
-                    root = tk.Tk()
-                    app = EKYCApp(root)
-                    root.mainloop()
-                elif role == "Employee" and username == "employee" and password == "emp123":
-                     login_window.destroy()
-                     root = tk.Tk()
-                     app = EKYCApp(root)
-                     root.mainloop()
-                else:
-                    messagebox.showerror("Login Failed", "Invalid credentials. Please try again.")
+    if role == "Admin" and username == "admin" and password == "admin123":
+        login_window.destroy()
+        root = tk.Tk()
+        app = EKYCApp(root, role="Admin")
+        root.mainloop()
+    elif role == "Employee" and username == "employee" and password == "emp123":
+        login_window.destroy()
+        root = tk.Tk()
+        app = EKYCApp(root, role="Employee")
+        root.mainloop()
+    else:
+        messagebox.showerror("Login Failed", "Invalid credentials. Please try again.")
+
 
 def show_login_screen():
-                login_window = tk.Tk()
-                login_window.title("eKYC Login")
-                login_window.geometry("400x300")
-                login_window.configure(bg="#f0f0f0")
-                login_window.resizable(False, False)
+    login_window = tk.Tk()
+    login_window.title("eKYC Login")
+    login_window.geometry("400x300")
+    login_window.configure(bg="#f0f0f0")
+    login_window.resizable(False, False)
 
-                tk.Label(login_window, text="eKYC System Login", font=("Helvetica", 16, "bold"), bg="#f0f0f0").pack(pady=20)
+    tk.Label(login_window, text="eKYC System Login", font=("Helvetica", 16, "bold"), bg="#f0f0f0").pack(pady=20)
 
-                role_var = tk.StringVar(value="Employee")
-                username_var = tk.StringVar()
-                password_var = tk.StringVar()
+    role_var = tk.StringVar(value="Employee")
+    username_var = tk.StringVar()
+    password_var = tk.StringVar()
 
-                tk.Label(login_window, text="Select Role:", bg="#f0f0f0").pack(pady=(5, 0))
-                ttk.Combobox(login_window, textvariable=role_var, values=["Admin", "Employee"], state="readonly").pack(pady=5)
+    tk.Label(login_window, text="Select Role:", bg="#f0f0f0").pack(pady=(5, 0))
+    ttk.Combobox(login_window, textvariable=role_var, values=["Admin", "Employee"], state="readonly").pack(pady=5)
 
-                tk.Label(login_window, text="Username:", bg="#f0f0f0").pack(pady=(10, 0))
-                username_entry = ttk.Entry(login_window, textvariable=username_var)
-                username_entry.pack()
+    tk.Label(login_window, text="Username:", bg="#f0f0f0").pack(pady=(10, 0))
+    ttk.Entry(login_window, textvariable=username_var).pack()
 
-                tk.Label(login_window, text="Password:", bg="#f0f0f0").pack(pady=(10, 0))
-                password_entry = ttk.Entry(login_window, textvariable=password_var, show="*")
-                password_entry.pack()
+    tk.Label(login_window, text="Password:", bg="#f0f0f0").pack(pady=(10, 0))
+    ttk.Entry(login_window, textvariable=password_var, show="*").pack()
 
-                ttk.Button(
-                    login_window,
-                    text="Login",
-                    command=lambda: validate_login(role_var.get(), username_var.get(), password_var.get(), login_window)
-                ).pack(pady=20)
+    ttk.Button(
+        login_window,
+        text="Login",
+        command=lambda: validate_login(role_var.get(), username_var.get(), password_var.get(), login_window)
+    ).pack(pady=20)
 
-                login_window.mainloop()
+    login_window.mainloop()
+
 
 if __name__ == "__main__":
     show_login_screen()
