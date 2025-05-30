@@ -294,6 +294,20 @@ class EKYCApp:
                 nationality = matched_row[9]
                 timestamp = matched_row[15]
                 status = matched_row[14]
+                # ✅ Insert fingerprint match result into DB
+                data = {
+                    'Document Type': doc_type,
+                    'Name': name,
+                    'Father Name': father_name,
+                    'DOB': dob,
+                    'Gender': gender,
+                    'Aadhaar Number': aadhaar,
+                    'PAN Number': pan,
+                    'Passport Number': passport,
+                    'Nationality': nationality,
+                    'status': status,
+                }
+                insert_data(data, fingerprint_score=score)
                 
                 popup = tk.Toplevel(self.root)
                 popup.title("Fingerprint Match")

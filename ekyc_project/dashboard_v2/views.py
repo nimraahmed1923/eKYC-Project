@@ -1,16 +1,15 @@
-from django.shortcuts import render, redirect, get_object_or_404
+from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
-from django.db.models import Q, Avg
+from django.core.paginator import Paginator
 import csv
 import sqlite3
-from datetime import datetime
 import re
 
-# ---------- AUTHENTICATION VIEWS ----------
+# ---------- AUTH ----------
 
 def login_view(request):
     if request.method == 'POST':
@@ -40,7 +39,7 @@ def logout_view(request):
     return redirect('login')
 
 
-# ---------- PATTERN HELPERS ----------
+# ---------- VALIDATION HELPERS ----------
 
 def is_aadhaar(val):
     return bool(re.fullmatch(r'\d{12}', val or '')) and val != '000000000000'
@@ -51,30 +50,40 @@ def is_pan(val):
 def is_passport(val):
     val = (val or '').strip()
     return (
-        val != 'A0000000' and (
-            bool(re.fullmatch(r'[A-Z][0-9]{7}', val)) or
-            bool(re.fullmatch(r'\d{8}', val))
-        )
+        val.upper() != 'A0000000' and
+        bool(re.fullmatch(r'[A-Z0-9]{5,12}', val))
     )
 
-# ---------- DASHBOARD VIEW USING GUI DB ----------
+
+# ---------- DB HELPER ----------
 
 def fetch_ekyc_from_gui():
     conn = sqlite3.connect('ekyc_database.db')
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM ekyc_data ORDER BY timestamp DESC")
-    rows = cursor.fetchall()
+
+    # Add fingerprint_score column fallback if it doesn't exist
+    try:
+        cursor.execute("SELECT * FROM ekyc_data ORDER BY timestamp DESC")
+        rows = cursor.fetchall()
+    except sqlite3.OperationalError:
+        cursor.execute("ALTER TABLE ekyc_data ADD COLUMN fingerprint_score REAL")
+        conn.commit()
+        cursor.execute("SELECT * FROM ekyc_data ORDER BY timestamp DESC")
+        rows = cursor.fetchall()
+
     conn.close()
     return [dict(row) for row in rows]
+
+
+# ---------- DASHBOARD ----------
 
 @login_required
 def dashboard_view(request):
     query = request.GET.get('q', '').strip().lower()
-
+    page_number = request.GET.get('page', 1)
     all_entries = fetch_ekyc_from_gui()
 
-    # Apply search filter manually
     if query:
         all_entries = [
             e for e in all_entries if
@@ -84,20 +93,30 @@ def dashboard_view(request):
             query in (e['passport_number'] or '').lower()
         ]
 
+    def is_unknown(entry):
+        return (entry.get('name') or '').strip().lower() == 'unknown name'
+
+    def fingerprint_match(entry):
+        score = entry.get('fingerprint_score')
+        return score is not None and score >= 85
+
     total_records = len(all_entries)
     aadhaar_count = sum(1 for e in all_entries if is_aadhaar(e.get('aadhaar_number')))
     pan_count = sum(1 for e in all_entries if is_pan(e.get('pan_number')))
     passport_count = sum(1 for e in all_entries if is_passport(e.get('passport_number')))
+    fingerprint_match_count = sum(1 for e in all_entries if fingerprint_match(e))
 
-    # Risk counts (using hardcoded logic based on status/fraud_score if available)
-    high_risk_count = sum(1 for e in all_entries if (e.get('fraud_score') or 0) >= 0.8)
-    medium_risk_count = sum(1 for e in all_entries if 0.5 <= (e.get('fraud_score') or 0) < 0.8)
-    low_risk_count = sum(1 for e in all_entries if (e.get('fraud_score') or 0) < 0.5)
-    scores = [e.get('fraud_score') for e in all_entries if e.get('fraud_score') is not None]
-    average_fraud_score = round(sum(scores) / len(scores) * 100, 2) if scores else 0
+    # Fraud logic based on "Unknown Name"
+    high_risk_count = sum(1 for e in all_entries if is_unknown(e))
+    medium_risk_count = 0
+    low_risk_count = total_records - high_risk_count
+    average_fraud_score = round((high_risk_count / total_records) * 100, 2) if total_records > 0 else 0
+
+    # Pagination
+    paginator = Paginator(all_entries, 10)
+    page_obj = paginator.get_page(page_number)
 
     context = {
-        'recent_entries': all_entries,  # Now shows ALL entries from GUI DB
         'query': query,
         'total_records': total_records,
         'aadhaar_count': aadhaar_count,
@@ -107,11 +126,14 @@ def dashboard_view(request):
         'medium_risk_count': medium_risk_count,
         'low_risk_count': low_risk_count,
         'average_fraud_score': average_fraud_score,
+        'fingerprint_match_count': fingerprint_match_count,
+        'recent_entries': page_obj,
+        'page_obj': page_obj,
     }
     return render(request, 'dashboard_v2/dashboard.html', context)
 
 
-# ---------- ENTRY MANAGEMENT ----------
+# ---------- DELETE ----------
 
 @login_required
 def delete_entry(request, entry_id):
@@ -124,13 +146,15 @@ def delete_entry(request, entry_id):
     return redirect('dashboard')
 
 
+# ---------- VIEW ----------
+
 @login_required
 def view_records_view(request):
     records = fetch_ekyc_from_gui()
     return render(request, 'dashboard_v2/view_records.html', {'records': records})
 
 
-# ---------- EXPORT DATA ----------
+# ---------- EXPORT ----------
 
 @login_required
 def export_data_view(request):
@@ -141,19 +165,21 @@ def export_data_view(request):
     writer = csv.writer(response)
     writer.writerow([
         'ID', 'Name', 'Document Type', 'Aadhaar Number', 'PAN Number',
-        'Passport Number', 'Status', 'Fraud Score', 'Timestamp'
+        'Passport Number', 'Status', 'Fraud Score', 'Fingerprint Score', 'Timestamp'
     ])
     for e in entries:
         writer.writerow([
             e.get('id'), e.get('name'), e.get('document_type'),
             e.get('aadhaar_number'), e.get('pan_number'),
             e.get('passport_number'), e.get('status'),
-            e.get('fraud_score'), e.get('timestamp')
+            'High' if (e.get('name') or '').lower() == 'unknown name' else 'Low',
+            e.get('fingerprint_score') or 'N/A',
+            e.get('timestamp')
         ])
     return response
 
 
-# ---------- DOCUMENT FILTERED LISTS ----------
+# ---------- FILTERED VIEWS ----------
 
 @login_required
 def aadhaar_list(request):
@@ -181,8 +207,6 @@ def passport_list(request):
         entries = [e for e in entries if query in (e.get('name') or '').lower() or query in (e.get('passport_number') or '').lower()]
     return render(request, 'dashboard_v2/passport_list.html', {'entries': entries})
 
-
-# ---------- HOME ----------
 
 def home_view(request):
     return redirect('dashboard')

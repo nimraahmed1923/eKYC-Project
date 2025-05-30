@@ -3,8 +3,8 @@
 {% block content %}
 <h1 class="text-3xl font-bold mb-6">eKYC Admin Dashboard</h1>
 
-<!-- Summary cards -->
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+<!-- Summary Cards -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
     <div class="bg-indigo-100 p-4 rounded-lg shadow text-center">
         <p class="text-lg font-semibold text-indigo-700">Total Records</p>
         <p class="text-3xl font-bold">{{ total_records|default:'0' }}</p>
@@ -20,6 +20,10 @@
     <div class="bg-purple-100 p-4 rounded-lg shadow text-center">
         <p class="text-lg font-semibold text-purple-700">Passport</p>
         <p class="text-3xl font-bold">{{ passport_count|default:'0' }}</p>
+    </div>
+    <div class="bg-blue-100 p-4 rounded-lg shadow text-center">
+        <p class="text-lg font-semibold text-blue-700">Fingerprint Matches</p>
+        <p class="text-3xl font-bold">{{ fingerprint_match_count|default:'0' }}</p>
     </div>
 </div>
 
@@ -43,31 +47,25 @@
     </div>
 </div>
 
-<!-- Graph section -->
+<!-- Graphs -->
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
     <div class="bg-white p-4 rounded-lg shadow">
         <h2 class="text-xl font-semibold mb-4">Record Distribution</h2>
-        <div style="height: 180px;">
-            <canvas id="recordPieChart"></canvas>
-        </div>
+        <div style="height: 180px;"><canvas id="recordPieChart"></canvas></div>
     </div>
     <div class="bg-white p-4 rounded-lg shadow">
         <h2 class="text-xl font-semibold mb-4">Record Trends</h2>
-        <div style="height: 180px;">
-            <canvas id="recordBarChart"></canvas>
-        </div>
+        <div style="height: 180px;"><canvas id="recordBarChart"></canvas></div>
     </div>
 </div>
 
 <!-- Fraud Risk Pie Chart -->
 <div class="bg-white p-4 rounded-lg shadow mb-8">
     <h2 class="text-xl font-semibold mb-4">Fraud Risk Distribution</h2>
-    <div style="height: 180px;">
-        <canvas id="fraudPieChart"></canvas>
-    </div>
+    <div style="height: 180px;"><canvas id="fraudPieChart"></canvas></div>
 </div>
 
-<!-- Search and Download Controls -->
+<!-- Search + Download -->
 <div class="flex justify-between items-center mb-4">
     <input type="text" id="searchInput" placeholder="Search..." class="border p-2 rounded w-1/3">
     <button onclick="downloadSelected()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">Download Selected</button>
@@ -85,46 +83,101 @@
                     <th class="px-4 py-2 font-semibold">Aadhaar</th>
                     <th class="px-4 py-2 font-semibold">PAN</th>
                     <th class="px-4 py-2 font-semibold">Passport</th>
-                    <th class="px-4 py-2 font-semibold">Status</th>
-                    <th class="px-4 py-2 font-semibold">Fraud Score</th>
+                    <th class="px-4 py-2 font-semibold">Verification</th>
+                    <th class="px-4 py-2 font-semibold">Fraud Detected</th>
+                    <th class="px-4 py-2 font-semibold">Fingerprint</th>
                     <th class="px-4 py-2 font-semibold">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for entry in recent_entries %}
+                {% with entry.name|lower as name_lower %}
                 <tr class="border-t hover:bg-gray-50">
-                    <td class="px-4 py-2"><input type="checkbox" class="rowCheckbox"
-                        data-name="{{ entry.name }}"
-                        data-aadhaar="{{ entry.aadhaar_number }}"
-                        data-pan="{{ entry.pan_number }}"
-                        data-passport="{{ entry.passport_number }}"
-                        data-status="{{ entry.status }}"
-                        data-fraud="{{ entry.fraud_score }}"></td>
+                    <td class="px-4 py-2"><input type="checkbox" class="rowCheckbox"></td>
                     <td class="px-4 py-2">{{ entry.name }}</td>
-                    <td class="px-4 py-2">{{ entry.aadhaar_number }}</td>
-                    <td class="px-4 py-2">{{ entry.pan_number }}</td>
-                    <td class="px-4 py-2">{{ entry.passport_number }}</td>
+
+                    <!-- Aadhaar -->
                     <td class="px-4 py-2">
-                        {% if entry.status == 'verified' %}
-                        <span class="px-2 py-1 text-sm rounded bg-green-200 text-green-800">Verified</span>
-                        {% elif entry.status == 'flagged' %}
-                        <span class="px-2 py-1 text-sm rounded bg-red-200 text-red-800">Flagged</span>
+                        {% if entry.aadhaar_number == "000000000000" %}
+                            -
                         {% else %}
-                        <span class="px-2 py-1 text-sm rounded bg-gray-200 text-gray-800">{{ entry.status }}</span>
+                            {{ entry.aadhaar_number }}
                         {% endif %}
                     </td>
-                    <td class="px-4 py-2">{{ entry.fraud_score|floatformat:2 }}</td>
+
+                    <!-- PAN -->
+                    <td class="px-4 py-2">
+                        {% if entry.pan_number == "AAAAA0000A" %}
+                            -
+                        {% else %}
+                            {{ entry.pan_number }}
+                        {% endif %}
+                    </td>
+
+                    <!-- Passport -->
+                    <td class="px-4 py-2">
+                        {% if entry.passport_number|upper == "A0000000" %}
+                            -
+                        {% else %}
+                            {{ entry.passport_number }}
+                        {% endif %}
+                    </td>
+
+                    <!-- Verification -->
+                    <td class="px-4 py-2">
+                        {% if name_lower == "unknown name" %}
+                        <span class="px-2 py-1 text-sm rounded bg-red-200 text-red-800">Flagged</span>
+                        {% else %}
+                        <span class="px-2 py-1 text-sm rounded bg-green-200 text-green-800">Verified</span>
+                        {% endif %}
+                    </td>
+
+                    <!-- Fraud -->
+                    <td class="px-4 py-2">
+                        {% if name_lower == "unknown name" %}
+                        <span class="px-2 py-1 text-sm rounded bg-red-200 text-red-800">Fraud</span>
+                        {% else %}
+                        <span class="px-2 py-1 text-sm rounded bg-green-200 text-green-800">Not Fraud</span>
+                        {% endif %}
+                    </td>
+
+                    <!-- Fingerprint -->
+                    <td class="px-4 py-2">
+                        {% if entry.fingerprint_score and entry.fingerprint_score|add:0 >= 85 %}
+                        <span class="px-2 py-1 text-sm rounded bg-green-100 text-green-800">Matched ✅</span>
+                        {% else %}
+                        <span class="px-2 py-1 text-sm rounded bg-red-100 text-red-800">Not Matched ❌</span>
+                        {% endif %}
+                    </td>
+
+                    <!-- Actions -->
                     <td class="px-4 py-2">
                         <a href="{% url 'delete_entry' entry.id %}" class="text-red-600 hover:text-red-800">Delete</a>
                     </td>
                 </tr>
+                {% endwith %}
                 {% empty %}
-                <tr><td colspan="8" class="px-4 py-2 text-center text-gray-500">No entries found.</td></tr>
+                <tr><td colspan="9" class="px-4 py-2 text-center text-gray-500">No entries found.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
+
+<!-- Pagination -->
+{% if page_obj.has_other_pages %}
+<div class="mt-4 flex justify-center space-x-2">
+    {% if page_obj.has_previous %}
+    <a href="?page={{ page_obj.previous_page_number }}" class="px-3 py-1 bg-gray-200 rounded">Previous</a>
+    {% endif %}
+    <span class="px-3 py-1 bg-blue-200 rounded text-blue-900 font-semibold">
+        Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+    </span>
+    {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}" class="px-3 py-1 bg-gray-200 rounded">Next</a>
+    {% endif %}
+</div>
+{% endif %}
 
 <script>
     const pieCtx = document.getElementById('recordPieChart').getContext('2d');
