@@ -9,10 +9,6 @@ from fingerprint_matcher import find_best_match
 from fraud_predictor import predict_fraud
 from manage_db import delete_user_by_id
 
-
-
-
-
 def show_ocr_result(data):
     popup = Toplevel()
     popup.title("OCR Extraction Result")
@@ -152,6 +148,7 @@ class EKYCApp:
         ttk.Button(self.card_frame, text="4. Match Fingerprint", command=self.match_fingerprint).pack(pady=5)
         ttk.Button(self.card_frame, text="5. Exit", command=root.quit).pack(pady=10)
 
+        # Toggle Theme
         self.toggle_frame = tk.Frame(root, bg=self.bg_color)
         self.toggle_frame.pack(pady=10)
 
@@ -163,6 +160,17 @@ class EKYCApp:
             command=self.toggle_theme, variable=tk.IntVar(value=0)
         )
         self.theme_switch.pack(side="left", padx=10)
+
+        # 🔓 Logout Button
+        ttk.Button(self.root, text="Logout", command=self.logout).pack(pady=(0, 15))
+
+
+    # ✅ Moved logout method OUTSIDE __init__ and inside class
+    def logout(self):
+        confirm = messagebox.askyesno("Logout", "Are you sure you want to logout?")
+        if confirm:
+            self.root.destroy()
+            show_login_screen()
     def setup_styles(self):
         style = ttk.Style()
         style.theme_use('clam')
@@ -207,9 +215,10 @@ class EKYCApp:
         win.title("Stored eKYC Data")
         win.geometry("1200x400")
 
+    # Column names (first column will show S.No)
         columns = [
-            "ID", "Document Type", "Name", "Father Name", "DOB", "Gender",
-            "Aadhaar", "PAN", "Passport", "Nationality", 
+            "S.No", "Document Type", "Name", "Father Name", "DOB", "Gender",
+            "Aadhaar", "PAN", "Passport", "Nationality"
         ]
         tree = ttk.Treeview(win, columns=columns, show="headings")
 
@@ -217,35 +226,36 @@ class EKYCApp:
             tree.heading(col, text=col)
             tree.column(col, width=120)
 
-        for row in rows:
-            tree.insert("", tk.END, values=row)
+    # Insert data with sequential numbering and store actual ID in tag
+        for index, row in enumerate(rows, start=1):
+            real_id = row[0]  # Actual DB ID
+            display_row = list(row)
+            display_row[0] = index  # Show S.No instead of DB ID
+            tree.insert("", tk.END, values=display_row, tags=(str(real_id),))
 
         tree.pack(fill=tk.BOTH, expand=True)
 
-
-
-        # Add vertical scrollbar
+    # Add scrollbar
         scrollbar = Scrollbar(win, orient="vertical", command=tree.yview)
         tree.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side="right", fill="y")
         tree.pack(expand=True, fill="both", padx=10, pady=10)
-        # Delete button
+
+    # Delete button
         def delete_selected_row():
             selected_item = tree.selection()
             if not selected_item:
-               messagebox.showwarning("Warning", "Please select a row to delete.")
-               return
-        
-            item = tree.item(selected_item)
-            row_values = item["values"]
-            user_id = row_values[0]  # Assuming first column is the unique ID
+                messagebox.showwarning("Warning", "Please select a row to delete.")
+                return
 
-        # Confirm before deletion
-            confirm = messagebox.askyesno("Confirm", f"Delete user ID {user_id}?")
+            item = selected_item[0]
+            real_id = tree.item(item, 'tags')[0]  # Get original ID for deletion
+
+            confirm = messagebox.askyesno("Confirm", f"Delete user ID {real_id}?")
             if confirm:
-                delete_user_by_id(user_id)  # <-- Define this in your DB module
-                tree.delete(selected_item)
-                messagebox.showinfo("Deleted", f"User ID {user_id} deleted.")
+                delete_user_by_id(real_id)
+                tree.delete(item)
+                messagebox.showinfo("Deleted", f"User ID {real_id} deleted.")
 
         delete_button = tk.Button(win, text="Delete Selected Row", command=delete_selected_row, bg="red", fg="white")
         delete_button.pack(pady=10)
@@ -435,33 +445,56 @@ def validate_login(role, username, password, login_window):
 def show_login_screen():
     login_window = tk.Tk()
     login_window.title("eKYC Login")
-    login_window.geometry("400x300")
-    login_window.configure(bg="#f0f0f0")
+    login_window.geometry("420x440")
+    login_window.configure(bg="white")
     login_window.resizable(False, False)
 
-    tk.Label(login_window, text="eKYC System Login", font=("Helvetica", 16, "bold"), bg="#f0f0f0").pack(pady=20)
+    # 🔷 Header
+    header = tk.Frame(login_window, bg="#00a8a8", height=60)
+    header.pack(fill="x")
+    tk.Label(header, text="eKYC System Login", font=("Helvetica", 16, "bold"), bg="#00a8a8", fg="white").pack(pady=15)
 
+    # 🔹 Form Frame
+    form_frame = tk.Frame(login_window, bg="white")
+    form_frame.pack(pady=20)
+
+    # Role
+    tk.Label(form_frame, text="Select Role", font=("Helvetica", 11), bg="white", fg="#333").grid(row=0, column=0, sticky="w", padx=10, pady=(5, 0))
     role_var = tk.StringVar(value="Employee")
+    ttk.Combobox(form_frame, textvariable=role_var, values=["Admin", "Employee"], state="readonly", width=32).grid(row=1, column=0, padx=10, pady=(0, 15))
+
+    # Username
+    tk.Label(form_frame, text="Username", font=("Helvetica", 11), bg="white", fg="#333").grid(row=2, column=0, sticky="w", padx=10)
     username_var = tk.StringVar()
+    ttk.Entry(form_frame, textvariable=username_var, width=34).grid(row=3, column=0, padx=10, pady=(0, 15))
+
+    # Password
+    tk.Label(form_frame, text="Password", font=("Helvetica", 11), bg="white", fg="#333").grid(row=4, column=0, sticky="w", padx=10)
     password_var = tk.StringVar()
+    password_entry = ttk.Entry(form_frame, textvariable=password_var, width=34, show="*")
+    password_entry.grid(row=5, column=0, padx=10, pady=(0, 5))
 
-    tk.Label(login_window, text="Select Role:", bg="#f0f0f0").pack(pady=(5, 0))
-    ttk.Combobox(login_window, textvariable=role_var, values=["Admin", "Employee"], state="readonly").pack(pady=5)
+    # 👁️ Show/Hide Password
+    show_pass_var = tk.BooleanVar()
+    def toggle_password():
+        password_entry.config(show="" if show_pass_var.get() else "*")
+    tk.Checkbutton(form_frame, text="Show Password", variable=show_pass_var, command=toggle_password, bg="white", font=("Helvetica", 9)).grid(row=6, column=0, sticky="w", padx=10)
 
-    tk.Label(login_window, text="Username:", bg="#f0f0f0").pack(pady=(10, 0))
-    ttk.Entry(login_window, textvariable=username_var).pack()
+    # 📝 Remember Me
+    remember_var = tk.BooleanVar()
+    tk.Checkbutton(form_frame, text="Remember Me", variable=remember_var, bg="white", font=("Helvetica", 9)).grid(row=7, column=0, sticky="w", padx=10, pady=(5, 10))
 
-    tk.Label(login_window, text="Password:", bg="#f0f0f0").pack(pady=(10, 0))
-    ttk.Entry(login_window, textvariable=password_var, show="*").pack()
-
+    # 🔓 Login Button
     ttk.Button(
         login_window,
         text="Login",
         command=lambda: validate_login(role_var.get(), username_var.get(), password_var.get(), login_window)
-    ).pack(pady=20)
+    ).pack(pady=10)
+
+    # Footer
+    tk.Label(login_window, text="© 2025 eKYC App", font=("Arial", 8), bg="white", fg="#888").pack(side="bottom", pady=10)
 
     login_window.mainloop()
-
 
 if __name__ == "__main__":
     show_login_screen()
