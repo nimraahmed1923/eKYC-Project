@@ -139,15 +139,14 @@ class EKYCApp:
         self.doc_type_var.set("Aadhaar")
         ttk.OptionMenu(self.card_frame, self.doc_type_var, "Aadhaar", "Aadhaar", "PAN", "Passport").pack(pady=(0, 5))
 
-        ttk.Button(self.card_frame, text="1. Extract Document Data (OCR)", command=self.ocr).pack(pady=5)
+        ttk.Button(self.card_frame, text=" Extract Document Data (OCR)", command=self.ocr).pack(pady=5)
 
         if self.role == "Admin":
-            ttk.Button(self.card_frame, text="2. Show Stored eKYC Data", command=self.show_data).pack(pady=5)
-            ttk.Button(self.card_frame, text="3. Export All eKYC to CSV", command=self.export_csv).pack(pady=5)
+            ttk.Button(self.card_frame, text=" Show Stored eKYC Data", command=self.show_data).pack(pady=5)
+            ttk.Button(self.card_frame, text=" Export All eKYC to CSV", command=self.export_csv).pack(pady=5)
 
-        ttk.Button(self.card_frame, text="4. Match Fingerprint", command=self.match_fingerprint).pack(pady=5)
-        ttk.Button(self.card_frame, text="5. Exit", command=root.quit).pack(pady=10)
-
+        ttk.Button(self.card_frame, text=" Match Fingerprint", command=self.match_fingerprint).pack(pady=5)
+        
         # Toggle Theme
         self.toggle_frame = tk.Frame(root, bg=self.bg_color)
         self.toggle_frame.pack(pady=10)
